@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, CreditCard, ShieldCheck, Phone, Landmark, Copy, ExternalLink, Loader2, MousePointerClick } from 'lucide-react';
+import { X, Check, CreditCard, ShieldCheck, Phone, Landmark, Copy, Loader2, MousePointerClick } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 interface PaymentModalProps {
@@ -70,27 +70,95 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const startCiderPay = (tier: typeof TIERS[0]) => {
+  const startCiderPay = async (tier: typeof TIERS[0]) => {
     setStep('cider_process');
     
-    // --- REAL INTEGRATION LOGIC ---
-    // In a real scenario, you construct the URL with your Member ID and Product Info.
-    // Example: https://www.ciderpay.com/pay/{YOUR_MEMBER_ID}?goodsName={...}&price={...}
-    
-    // NOTE: This is a demo URL structure. Replace 'public_test' with your actual CiderPay ID/Link.
-    const baseUrl = "https://www.ciderpay.com"; 
-    // Since we don't have a real Merchant ID, we'll open the main page or a sample endpoint to simulate the window.
-    // In production, use: `${baseUrl}/pay/YOUR_ID_HERE`
-    const targetUrl = `${baseUrl}`; 
-
+    // 1. Open Popup IMMEDIATELY (Synchronously) to prevent browser blocking
+    // Using about:blank initially, then we will redirect it.
     const popup = window.open(
-        targetUrl, 
+        '', 
         'CiderPay', 
-        'width=800,height=600,scrollbars=yes,resizable=yes'
+        'width=800,height=700,scrollbars=yes,resizable=yes'
     );
 
     if (!popup || popup.closed || typeof popup.closed === 'undefined') {
         alert("Popup blocked! Please allow popups to proceed with payment.");
+        return;
+    }
+
+    // Show loading state inside the popup while API fetches
+    popup.document.write(`
+        <html>
+            <head>
+                <title>Connecting to CiderPay...</title>
+                <style>
+                    body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f8fafc; margin: 0; }
+                    .loader { width: 40px; height: 40px; border: 4px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+                    @keyframes spin { to { transform: rotate(360deg); } }
+                    h3 { color: #1e293b; margin: 0 0 8px 0; }
+                    p { color: #64748b; font-size: 14px; margin: 0; }
+                </style>
+            </head>
+            <body>
+                <div class="loader"></div>
+                <h3>Secure Payment</h3>
+                <p>Initializing CiderPay Gateway...</p>
+            </body>
+        </html>
+    `);
+
+    // --- API Configuration (Based on PDF Docs) ---
+    const API_URL = "https://api.ciderpay.com/oapi/payment/request";
+    // TODO: You must replace these with your actual CiderPay Member ID and Token
+    const MEMBER_ID = "public_test"; // Using public_test for demo
+    const APPROVAL_TOKEN = "test_token"; 
+
+    try {
+        // 2. Prepare Payload (PDF Page 1 & 6)
+        const payload = {
+            memberID: MEMBER_ID,
+            goodName: tier.name,
+            price: tier.price,
+            mobile: phoneNumber,
+            recvPhone: phoneNumber, // Required in some contexts
+            returnurl: window.location.href, // Return URL
+            orderNo: `ORDER_${Date.now()}`,
+            taxFreePrice: 0, 
+            taxPrice: Math.round(tier.price / 1.1) // Simple tax calc example
+        };
+
+        // 3. Call API
+        // NOTE: Direct calls from frontend often fail due to CORS. 
+        // We use a try/catch to fallback to a GET link if the API call fails.
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'approvalToken': APPROVAL_TOKEN // Header as per PDF Page 1
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        // 4. Redirect Popup
+        if (data.success && data.payUrl) {
+            popup.location.href = data.payUrl;
+        } else {
+            console.warn("API Error or Demo Mode:", data);
+            throw new Error("API_FAIL");
+        }
+
+    } catch (e) {
+        console.warn("CiderPay API direct call failed (likely CORS). Switching to Link Payment Fallback.", e);
+        
+        // --- FALLBACK STRATEGY ---
+        // If the POST API fails (common in frontend-only), we construct a direct Payment Link.
+        // This ensures the window actually shows a payment page.
+        // Format: https://www.ciderpay.com/pay/{memberID}?goodsName=...&price=...
+        const fallbackUrl = `https://www.ciderpay.com/pay/${MEMBER_ID}?goodsName=${encodeURIComponent(tier.name)}&price=${tier.price}`;
+        
+        popup.location.href = fallbackUrl;
     }
   };
 
