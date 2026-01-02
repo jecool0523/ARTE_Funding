@@ -1,5 +1,5 @@
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell } from 'recharts';
 import { PartyPopper } from 'lucide-react';
 import ShareButton from './ShareButton';
 
@@ -33,33 +33,31 @@ const FundingGauge: React.FC<FundingGaugeProps> = ({ currentAmount, goalAmount }
       <div className="absolute top-0 left-10 w-32 h-32 bg-brand-purple/20 rounded-full blur-[60px]"></div>
       <div className="absolute bottom-0 right-10 w-32 h-32 bg-brand-pink/20 rounded-full blur-[60px]"></div>
 
-      <div className="relative w-56 h-56">
-        {/* Chart Container */}
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius={80} // Increased thickness for better visibility
-              outerRadius={95}
-              startAngle={90}
-              endAngle={-270}
-              paddingAngle={0}
-              dataKey="value"
-              stroke="none"
-              cornerRadius={visualProgress < 100 ? 10 : 0} // Round corners only if not full
-            >
-              {data.map((entry, index) => (
-                <Cell 
-                    key={`cell-${index}`} 
-                    fill={index === 0 ? '#FF6B9C' : 'currentColor'} 
-                    className={index === 1 ? 'text-slate-100 dark:text-[#333]' : ''}
-                />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
+      <div className="relative w-56 h-56 flex items-center justify-center">
+        {/* Chart Container - Fixed size 224px (w-56) to prevent Recharts measurement errors */}
+        <PieChart width={224} height={224}>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={80} // Increased thickness for better visibility
+            outerRadius={95}
+            startAngle={90}
+            endAngle={-270}
+            paddingAngle={0}
+            dataKey="value"
+            stroke="none"
+            cornerRadius={visualProgress < 100 ? 10 : 0} // Round corners only if not full
+          >
+            {data.map((entry, index) => (
+              <Cell 
+                  key={`cell-${index}`} 
+                  fill={index === 0 ? '#FF6B9C' : 'currentColor'} 
+                  className={index === 1 ? 'text-slate-100 dark:text-[#333]' : ''}
+              />
+            ))}
+          </Pie>
+        </PieChart>
         
         {/* Center Content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">

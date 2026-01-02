@@ -7,20 +7,26 @@ interface ShareButtonProps {
   iconSize?: number;
   label?: string; // If present, shows text next to icon
   variant?: 'circle' | 'pill' | 'text';
+  shareData?: {
+    title?: string;
+    text?: string;
+    url?: string;
+  };
 }
 
 const ShareButton: React.FC<ShareButtonProps> = ({ 
   className = "", 
   iconSize = 18, 
   label,
-  variant = 'circle'
+  variant = 'circle',
+  shareData: customShareData
 }) => {
   
   const handleShare = async () => {
     const shareData = {
-      title: PROJECT_DATA.share.title,
-      text: PROJECT_DATA.share.text,
-      url: window.location.href,
+      title: customShareData?.title || PROJECT_DATA.share.title,
+      text: customShareData?.text || PROJECT_DATA.share.text,
+      url: customShareData?.url || window.location.href,
     };
 
     if (navigator.share) {
@@ -31,7 +37,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({
       }
     } else {
       // Fallback
-      navigator.clipboard.writeText(window.location.href);
+      navigator.clipboard.writeText(shareData.url);
       alert('Link copied to clipboard!');
     }
   };

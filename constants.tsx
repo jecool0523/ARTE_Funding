@@ -2,69 +2,72 @@ import { ProjectData, Comment } from './types';
 
 export const PROJECT_DATA: ProjectData = {
   meta: {
-    title: "The Cat's Meow:\nA Purr-fect Melody",
+    title: "RENT:\nSchool Edition",
     company: "Dream Big Productions",
-    tags: ["Musical", "Romance"],
-    logoUrl: "https://picsum.photos/50/50?random=10"
+    tags: ["Musical", "Rock", "Youth"],
+    logoUrl: "https://picsum.photos/50/50?random=12"
   },
   hero: {
-    mediaUrl: "https://picsum.photos/800/1200?random=99",
-    badge: "Official Trailer"
+    // MediaUrl is for the poster image (displayed before video loads)
+    mediaUrl: "https://picsum.photos/800/1200?random=101",
+    // VideoUrl is for the actual video file in the assets folder
+    videoUrl: "assets/rent_video.mp4", 
+    badge: "D-1 PREMIERE"
   },
   funding: {
-    goalAmount: 1000000,
+    goalAmount: 5000000,
   },
   synopsis: [
     {
       id: '1',
-      icon: '🏙️',
-      title: 'Big City Dreams',
-      description: 'In the bustling alleyways of New York City, a stray cat named Whiskers dreams of performing on Broadway.',
-      highlight: 'New York City'
+      icon: '🕯️',
+      title: 'Seasons of Love',
+      description: '525,600 minutes. How do you measure a year in the life? Join us for a story about falling in love, finding your voice, and living for today.',
+      highlight: '525,600 minutes'
     },
     {
       id: '2',
-      icon: '🎷',
-      title: 'Jazz & Friendship',
-      description: 'When he stumbles upon a struggling jazz club run by a retired opera singer, his life changes forever. Join us on this toe-tapping journey!',
-      highlight: 'toe-tapping journey'
+      icon: '🎸',
+      title: 'No Day But Today',
+      description: 'Set in the East Village of New York City, a group of impoverished young artists struggle to survive and create a life under the shadow of HIV/AIDS.',
+      highlight: 'New York City'
     }
   ],
   cast: [
     {
       id: '1',
-      name: 'Luna',
-      role: 'The Diva',
-      actorName: 'Sarah J.',
-      imageUrl: 'https://picsum.photos/200/200?random=1'
+      name: 'Mark',
+      role: 'Filmmaker',
+      actorName: 'Ji-Hoon K.',
+      imageUrl: 'https://picsum.photos/200/200?random=11'
     },
     {
       id: '2',
-      name: 'Whiskers',
-      role: 'The Dreamer',
-      actorName: 'Mike C.',
-      imageUrl: 'https://picsum.photos/200/200?random=2'
+      name: 'Roger',
+      role: 'Musician',
+      actorName: 'Min-Su L.',
+      imageUrl: 'https://picsum.photos/200/200?random=12'
     },
     {
       id: '3',
-      name: 'Bella',
-      role: 'The Sweetheart',
-      actorName: 'Emily D.',
-      imageUrl: 'https://picsum.photos/200/200?random=3'
+      name: 'Mimi',
+      role: 'Dancer',
+      actorName: 'Su-Jin P.',
+      imageUrl: 'https://picsum.photos/200/200?random=13'
     },
     {
       id: '4',
-      name: 'Tom',
-      role: 'The Grump',
-      actorName: 'David K.',
-      imageUrl: 'https://picsum.photos/200/200?random=4'
+      name: 'Angel',
+      role: 'Drummer',
+      actorName: 'Tae-Young C.',
+      imageUrl: 'https://picsum.photos/200/200?random=14'
     },
     {
       id: '5',
-      name: 'Jazzy',
-      role: 'The Sax Player',
-      actorName: 'Alex R.',
-      imageUrl: 'https://picsum.photos/200/200?random=5'
+      name: 'Maureen',
+      role: 'Performer',
+      actorName: 'Ha-Eun Y.',
+      imageUrl: 'https://picsum.photos/200/200?random=15'
     }
   ],
   venue: {
@@ -73,8 +76,8 @@ export const PROJECT_DATA: ProjectData = {
     mapImageUrl: "https://picsum.photos/600/300?grayscale"
   },
   share: {
-    title: "The Cat's Meow Mus\\ical",
-    text: "Help bring this purr-fect melody to life! Check out the funding project.",
+    title: "RENT: School Edition",
+    text: "No day but today! Support our production of RENT.",
   }
 };
 
@@ -86,7 +89,7 @@ export const COMMENTS: Comment[] = [
     author: 'Ji-Soo Park',
     initials: 'JS',
     timeAgo: '2h ago',
-    text: "Can't wait to see this! The character designs are so adorable! 😻",
+    text: "The teaser looks amazing! Mark's camera work is on point! 🎥",
     colorFrom: 'from-blue-400',
     colorTo: 'to-blue-600',
     align: 'left'
@@ -96,7 +99,7 @@ export const COMMENTS: Comment[] = [
     author: 'Min-Kyung Lee',
     initials: 'MK',
     timeAgo: '5h ago',
-    text: "Supported! Hope it reaches the stretch goal for the soundtrack CD. 💿",
+    text: "Can't wait to hear 'One Song Glory' live! 🎸",
     colorFrom: 'from-brand-pink',
     colorTo: 'to-pink-600',
     align: 'right'

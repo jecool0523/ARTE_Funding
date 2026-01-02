@@ -16,7 +16,15 @@ const SynopsisSection = () => {
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white transition-colors">Synopsis</h2>
                 </div>
                 {/* Share Button for Synopsis */}
-                <ShareButton variant="text" label="Share Story" iconSize={14} />
+                <ShareButton 
+                  variant="text" 
+                  label="Share Story" 
+                  iconSize={14} 
+                  shareData={{
+                    title: "The Cat's Meow - Synopsis",
+                    text: "Check out the heartwarming story of Whiskers and his journey on Broadway! 🐈🎷 #TheCatsMeow #Musical"
+                  }}
+                />
             </div>
         </ScrollReveal>
         {PROJECT_DATA.synopsis.map((item, idx) => (
