@@ -1,10 +1,6 @@
 import React from 'react';
 
-declare global {
-  interface Window {
-    IMP: any;
-  }
-}
+// Removed IMP type declaration as we switched to CiderPay
 
 export interface CastMember {
   id: string;

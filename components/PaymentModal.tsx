@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, CreditCard, ShieldCheck, Phone, Landmark, Copy } from 'lucide-react';
+import { X, Check, CreditCard, ShieldCheck, Phone, Landmark, Copy, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 interface PaymentModalProps {
@@ -13,11 +13,19 @@ const TIERS = [
   { id: 3, name: 'Angel Investor', price: 300000, desc: '2x VIP Tickets + Name on Seat + Merch Set' },
 ];
 
-const PG_METHODS = [
-  { id: 'card', pg: 'html5_inicis', name: 'Credit Card', icon: <CreditCard size={20} /> },
-  { id: 'kakao', pg: 'kakaopay', name: 'KakaoPay', icon: <span className="font-bold text-black bg-yellow-400 px-1 rounded text-[10px]">K</span> },
-  { id: 'toss', pg: 'tosspay', name: 'Toss Pay', icon: <span className="font-bold text-white bg-blue-500 px-1 rounded text-[10px]">T</span> },
-  { id: 'manual', pg: 'manual', name: 'Bank Transfer', icon: <Landmark size={20} /> },
+const PAYMENT_METHODS = [
+  { 
+    id: 'ciderpay', 
+    name: 'CiderPay', 
+    description: 'Credit Card / Mobile',
+    icon: <CreditCard size={20} className="text-blue-500" /> 
+  },
+  { 
+    id: 'manual', 
+    name: 'Bank Transfer', 
+    description: 'Direct Deposit',
+    icon: <Landmark size={20} className="text-slate-500" /> 
+  },
 ];
 
 const BANK_INFO = {
@@ -27,9 +35,9 @@ const BANK_INFO = {
 };
 
 const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
-  const [step, setStep] = useState<'select' | 'bank_info' | 'processing' | 'success'>('select');
+  const [step, setStep] = useState<'select' | 'bank_info' | 'cider_process' | 'processing' | 'success'>('select');
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
-  const [selectedMethodId, setSelectedMethodId] = useState<string>('card');
+  const [selectedMethodId, setSelectedMethodId] = useState<string>('ciderpay');
   const [phoneNumber, setPhoneNumber] = useState('');
 
   useEffect(() => {
@@ -51,49 +59,33 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
     }
 
     const tier = TIERS.find(t => t.id === selectedTier);
-    const method = PG_METHODS.find(m => m.id === selectedMethodId);
-    
-    if (!tier || !method) return;
+    if (!tier) return;
 
-    // --- Direct Bank Transfer Logic ---
-    if (method.id === 'manual') {
+    // --- Logic Switch ---
+    if (selectedMethodId === 'manual') {
         setStep('bank_info');
-        return;
+    } else {
+        // Start CiderPay Flow
+        startCiderPay(tier);
     }
+  };
 
-    // --- PortOne (Iamport) Integration ---
-    if (!window.IMP) {
-        alert("Payment module not loaded. Please refresh.");
-        return;
+  const startCiderPay = async (tier: typeof TIERS[0]) => {
+    // In a real implementation, you would:
+    // 1. Call your backend to generate a CiderPay Payment Link or Request Params.
+    // 2. Open that link in a new window/popup or redirect the user.
+    
+    // For this demo:
+    const confirm = window.confirm(`Proceed to CiderPay Secure Payment?\n\nAmount: ₩${tier.price.toLocaleString()}`);
+    if (confirm) {
+        setStep('cider_process');
+        
+        // Simulate waiting for user to complete payment in the popup
+        // In reality, you'd listen for a webhook or use window.postMessage
+        setTimeout(async () => {
+            await recordPledge(tier.price, tier.name, phoneNumber, `cider_${Date.now()}`);
+        }, 3000);
     }
-
-    const IMP = window.IMP;
-    // NOTE: Use 'imp46433215' for public test mode, or replace with your own Merchant ID.
-    IMP.init('imp46433215'); 
-
-    // Open Payment Window
-    IMP.request_pay({
-        pg: method.pg, // html5_inicis, kakaopay, tosspay
-        pay_method: 'card', // 'card' is typically used for all simple flows in Korea except specific direct transfers
-        merchant_uid: `mid_${new Date().getTime()}`, // Unique Order ID
-        name: tier.name,
-        amount: tier.price,
-        buyer_tel: phoneNumber,
-        m_redirect_url: window.location.href, // For mobile redirects
-    }, async (rsp: any) => {
-        if (rsp.success) {
-            // Payment Successful
-            console.log('Payment success:', rsp);
-            setStep('processing');
-            
-            // Record to Supabase
-            await recordPledge(tier.price, tier.name, phoneNumber, rsp.imp_uid);
-        } else {
-            // Payment Failed
-            console.error('Payment failed:', rsp);
-            alert(`Payment failed: ${rsp.error_msg}`);
-        }
-    });
   };
 
   const handleManualConfirm = async () => {
@@ -123,11 +115,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
         ]);
 
     if (dbError) {
-        // Log the full error object for debugging purposes
         console.warn('Supabase Insert Warning:', dbError);
         console.warn('Proceeding to success state despite DB error (Demo Mode)');
-        // We intentionally do not throw here to allow the UI to show the Success screen.
-        // In a real production app with critical data, you might want to handle this differently (e.g., retry logic).
     }
 
     setStep('success');
@@ -221,22 +210,25 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
                     </p>
                 </div>
 
-                {/* Payment Method */}
+                {/* Payment Method Selection */}
                 <div>
                    <h3 className="text-xs font-bold text-slate-500 dark:text-gray-300 mb-3 uppercase tracking-wide">Payment Method</h3>
-                   <div className="grid grid-cols-4 gap-2">
-                     {PG_METHODS.map((method) => (
+                   <div className="grid grid-cols-2 gap-3">
+                     {PAYMENT_METHODS.map((method) => (
                        <button
                          key={method.id}
                          onClick={() => setSelectedMethodId(method.id)}
-                         className={`py-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-2 transition-all h-20 ${
+                         className={`p-4 rounded-xl border text-left transition-all ${
                            selectedMethodId === method.id
-                           ? 'bg-white text-brand-dark border-slate-200 shadow-lg'
+                           ? 'bg-white text-brand-dark border-brand-pink ring-1 ring-brand-pink shadow-md'
                            : 'bg-slate-50 dark:bg-white/5 text-slate-400 dark:text-gray-400 border-transparent hover:bg-slate-100 dark:hover:bg-white/10'
                          }`}
                        >
-                         {method.icon}
-                         <span className="text-[10px] text-center leading-tight">{method.name}</span>
+                         <div className="flex items-center gap-3 mb-1">
+                            {method.icon}
+                            <span className={`text-sm font-bold ${selectedMethodId === method.id ? 'text-slate-900' : ''}`}>{method.name}</span>
+                         </div>
+                         <div className="text-[10px] opacity-70 pl-8">{method.description}</div>
                        </button>
                      ))}
                    </div>
@@ -256,13 +248,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
                 >
                   {selectedTier ? (
                       <>
-                        <span>{selectedMethodId === 'manual' ? 'Next' : 'Pay'}</span>
+                        <span>{selectedMethodId === 'manual' ? 'Next' : 'Pay Now'}</span>
                         <span className="bg-black/20 px-2 py-0.5 rounded text-sm">₩{TIERS.find(t => t.id === selectedTier)?.price.toLocaleString()}</span>
                       </>
                   ) : 'Select Reward & Info'}
                 </button>
-                <div className="text-center mt-3 text-[10px] text-slate-400 dark:text-gray-500">
-                    Secured by PortOne
+                <div className="text-center mt-3 text-[10px] text-slate-400 dark:text-gray-500 flex items-center justify-center gap-1">
+                    <ShieldCheck size={10} /> Secured by {selectedMethodId === 'ciderpay' ? 'CiderPay' : 'Direct Transfer'}
                 </div>
             </div>
           </>
@@ -331,7 +323,25 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
            </div>
         )}
 
-        {/* --- STEP 2: PROCESSING (Centered) --- */}
+        {/* --- STEP: CIDERPAY PROCESSING --- */}
+        {step === 'cider_process' && (
+           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
+             <div className="w-20 h-20 mb-6 bg-blue-50 rounded-full flex items-center justify-center animate-pulse">
+                <CreditCard size={40} className="text-blue-500" />
+             </div>
+             <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Processing Payment...</h3>
+             <p className="text-slate-500 dark:text-gray-400 text-sm mb-8 leading-relaxed">
+                Please complete the payment in the CiderPay window.<br/>
+                Do not close this window until finished.
+             </p>
+             <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                Waiting for confirmation...
+             </div>
+           </div>
+        )}
+
+        {/* --- STEP 2: GENERIC PROCESSING (Used for manual) --- */}
         {step === 'processing' && (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
             <div className="relative mb-8">
