@@ -43,6 +43,13 @@ export interface NavTab {
   icon: React.ReactNode;
 }
 
+export interface GalleryItem {
+  id: string;
+  imageUrl: string;
+  caption: string;
+  size?: 'normal' | 'large' | 'tall'; // For masonry layout
+}
+
 export interface ProjectData {
   meta: {
     title: string; // e.g., "The Cat's Meow..."
@@ -60,6 +67,7 @@ export interface ProjectData {
   };
   synopsis: SynopsisItem[];
   cast: CastMember[];
+  gallery: GalleryItem[];
   venue: {
     name: string;
     address: string;

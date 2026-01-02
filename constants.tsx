@@ -1,5 +1,9 @@
 import { ProjectData, Comment } from './types';
 
+// Reverting to simple relative path to avoid "Invalid URL" errors in environments 
+// where import.meta.url might be undefined or unsupported.
+const VIDEO_PATH = 'assets/rent_video.mp4';
+
 export const PROJECT_DATA: ProjectData = {
   meta: {
     title: "RENT:\nSchool Edition",
@@ -8,10 +12,10 @@ export const PROJECT_DATA: ProjectData = {
     logoUrl: "https://picsum.photos/50/50?random=12"
   },
   hero: {
-    // MediaUrl is for the poster image (displayed before video loads)
+    // MediaUrl is for the poster image (displayed before video loads or on error)
     mediaUrl: "https://picsum.photos/800/1200?random=101",
-    // VideoUrl is for the actual video file in the assets folder
-    videoUrl: "assets/rent_video.mp4", 
+    // VideoUrl for the local file
+    videoUrl: VIDEO_PATH, 
     badge: "D-1 PREMIERE"
   },
   funding: {
@@ -70,6 +74,32 @@ export const PROJECT_DATA: ProjectData = {
       imageUrl: 'https://picsum.photos/200/200?random=15'
     }
   ],
+  gallery: [
+    {
+      id: '1',
+      imageUrl: 'https://picsum.photos/600/400?random=20',
+      caption: 'Full Cast Rehearsal',
+      size: 'large'
+    },
+    {
+      id: '2',
+      imageUrl: 'https://picsum.photos/300/400?random=21',
+      caption: 'Costume Design Sketch',
+      size: 'tall'
+    },
+    {
+      id: '3',
+      imageUrl: 'https://picsum.photos/400/300?random=22',
+      caption: 'The Band Warming Up',
+      size: 'normal'
+    },
+    {
+      id: '4',
+      imageUrl: 'https://picsum.photos/400/300?random=23',
+      caption: 'Set Construction Day 1',
+      size: 'normal'
+    }
+  ],
   venue: {
     name: "Dream Art Center",
     address: "123 Daehak-ro, Seoul",
@@ -81,8 +111,6 @@ export const PROJECT_DATA: ProjectData = {
   }
 };
 
-// Exporting separate lists for backward compatibility if needed, 
-// but components should ideally use PROJECT_DATA directly.
 export const COMMENTS: Comment[] = [
   {
     id: '1',

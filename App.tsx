@@ -8,6 +8,7 @@ import CastCarousel from './components/CastCarousel';
 import ScrollReveal from './components/ScrollReveal';
 import PaymentModal from './components/PaymentModal';
 import CheeringSection from './components/CheeringSection';
+import GallerySection from './components/GallerySection';
 import { MapPin, ExternalLink } from 'lucide-react';
 import { supabase } from './lib/supabaseClient';
 import { PROJECT_DATA } from './constants';
@@ -184,6 +185,9 @@ const App = () => {
 
             {/* Cheering Section (Real-time) */}
             <CheeringSection />
+
+            {/* Gallery Section */}
+            <GallerySection />
         
         </div>
       </div>
