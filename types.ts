@@ -1,5 +1,11 @@
 import React from 'react';
 
+declare global {
+  interface Window {
+    IMP: any;
+  }
+}
+
 export interface CastMember {
   id: string;
   name: string;
