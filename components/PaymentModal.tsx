@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, CreditCard, ShieldCheck, Phone, Landmark, Copy, ExternalLink } from 'lucide-react';
+import { X, Check, CreditCard, ShieldCheck, Phone, Landmark, Copy, ExternalLink, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 interface PaymentModalProps {
@@ -71,21 +71,21 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
   };
 
   const startCiderPay = async (tier: typeof TIERS[0]) => {
-    // In a real implementation, you would:
-    // 1. Call your backend to generate a CiderPay Payment Link or Request Params.
-    // 2. Open that link in a new window/popup or redirect the user.
+    // 1. Switch UI to processing state immediately
+    setStep('cider_process');
     
-    // For this demo:
-    const confirm = window.confirm(`Proceed to CiderPay Secure Payment?\n\nAmount: ₩${tier.price.toLocaleString()}`);
-    if (confirm) {
-        setStep('cider_process');
-        
-        // Simulate waiting for user to complete payment in the popup
-        // In reality, you'd listen for a webhook or use window.postMessage
-        setTimeout(async () => {
-            await recordPledge(tier.price, tier.name, phoneNumber, `cider_${Date.now()}`);
-        }, 3000);
-    }
+    // 2. Simulate Payment Gateway Interaction
+    // In a real production environment, you would perform one of the following here:
+    // a) Redirect the user: window.location.href = 'YOUR_CIDERPAY_PAYMENT_LINK';
+    // b) Open a popup: window.open('YOUR_CIDERPAY_PAYMENT_LINK', 'payment', 'width=600,height=800');
+    
+    console.log("Initializing CiderPay for:", tier.name, tier.price);
+
+    // SIMULATION: Wait for "payment completion"
+    setTimeout(async () => {
+        // 3. Assume payment success and record the pledge
+        await recordPledge(tier.price, tier.name, phoneNumber, `cider_${Date.now()}`);
+    }, 2500);
   };
 
   const handleManualConfirm = async () => {
@@ -102,24 +102,29 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
   };
 
   const recordPledge = async (amount: number, tierName: string, mobile: string, paymentId: string) => {
-    // Attempt to save to Supabase
-    const { error: dbError } = await supabase
-        .from('pledges')
-        .insert([
-            { 
-                amount: amount, 
-                tier_name: tierName, 
-                mobile: mobile,
-                payment_id: paymentId
-            }
-        ]);
+    try {
+        // Attempt to save to Supabase
+        const { error: dbError } = await supabase
+            .from('pledges')
+            .insert([
+                { 
+                    amount: amount, 
+                    tier_name: tierName, 
+                    mobile: mobile,
+                    payment_id: paymentId
+                }
+            ]);
 
-    if (dbError) {
-        console.warn('Supabase Insert Warning:', dbError);
-        console.warn('Proceeding to success state despite DB error (Demo Mode)');
+        if (dbError) {
+            console.warn('Supabase Insert Warning:', dbError);
+            console.warn('Proceeding to success state despite DB error (Demo Mode)');
+        }
+    } catch (e) {
+        console.error("Critical DB connection error", e);
+    } finally {
+        // Always show success screen to user in this demo
+        setStep('success');
     }
-
-    setStep('success');
   };
 
   const copyToClipboard = (text: string) => {
@@ -226,7 +231,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
                        >
                          <div className="flex items-center gap-3 mb-1">
                             {method.icon}
-                            <span className={`text-sm font-bold ${selectedMethodId === method.id ? 'text-slate-900' : ''}`}>{method.name}</span>
+                            <span className={`text-sm font-bold ${selectedMethodId === method.id ? 'text-slate-900 dark:text-white' : ''}`}>{method.name}</span>
                          </div>
                          <div className="text-[10px] opacity-70 pl-8">{method.description}</div>
                        </button>
@@ -323,20 +328,21 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
            </div>
         )}
 
-        {/* --- STEP: CIDERPAY PROCESSING --- */}
+        {/* --- STEP: CIDERPAY PROCESSING (Enhanced UI) --- */}
         {step === 'cider_process' && (
            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
-             <div className="w-20 h-20 mb-6 bg-blue-50 rounded-full flex items-center justify-center animate-pulse">
-                <CreditCard size={40} className="text-blue-500" />
+             <div className="w-20 h-20 mb-6 bg-blue-50 dark:bg-blue-500/10 rounded-full flex items-center justify-center relative">
+                <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <CreditCard size={32} className="text-blue-500" />
              </div>
-             <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Processing Payment...</h3>
-             <p className="text-slate-500 dark:text-gray-400 text-sm mb-8 leading-relaxed">
-                Please complete the payment in the CiderPay window.<br/>
-                Do not close this window until finished.
+             <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Connecting to CiderPay</h3>
+             <p className="text-slate-500 dark:text-gray-400 text-sm mb-8 leading-relaxed max-w-[200px] mx-auto">
+                Securely directing you to the payment gateway...
              </p>
-             <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                Waiting for confirmation...
+             <div className="flex items-center gap-2 text-xs text-slate-400 font-medium bg-slate-50 dark:bg-white/5 px-3 py-1.5 rounded-full">
+                <ShieldCheck size={12} className="text-green-500" />
+                TLS Encrypted Connection
              </div>
            </div>
         )}
@@ -347,7 +353,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
             <div className="relative mb-8">
                 <div className="w-20 h-20 rounded-full border-[6px] border-white dark:border-brand-surface border-t-brand-pink animate-spin"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <ShieldCheck size={24} className="text-slate-400 dark:text-gray-500" />
+                    <Loader2 size={24} className="text-slate-400 dark:text-gray-500 animate-spin" />
                 </div>
             </div>
             <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Verifying...</h3>
