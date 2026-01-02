@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, CreditCard, ShieldCheck, Phone, Landmark, Copy, ExternalLink, Loader2 } from 'lucide-react';
+import { X, Check, CreditCard, ShieldCheck, Phone, Landmark, Copy, ExternalLink, Loader2, MousePointerClick } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 interface PaymentModalProps {
@@ -70,22 +70,40 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const startCiderPay = async (tier: typeof TIERS[0]) => {
-    // 1. Switch UI to processing state immediately
+  const startCiderPay = (tier: typeof TIERS[0]) => {
     setStep('cider_process');
     
-    // 2. Simulate Payment Gateway Interaction
-    // In a real production environment, you would perform one of the following here:
-    // a) Redirect the user: window.location.href = 'YOUR_CIDERPAY_PAYMENT_LINK';
-    // b) Open a popup: window.open('YOUR_CIDERPAY_PAYMENT_LINK', 'payment', 'width=600,height=800');
+    // --- REAL INTEGRATION LOGIC ---
+    // In a real scenario, you construct the URL with your Member ID and Product Info.
+    // Example: https://www.ciderpay.com/pay/{YOUR_MEMBER_ID}?goodsName={...}&price={...}
     
-    console.log("Initializing CiderPay for:", tier.name, tier.price);
+    // NOTE: This is a demo URL structure. Replace 'public_test' with your actual CiderPay ID/Link.
+    const baseUrl = "https://www.ciderpay.com"; 
+    // Since we don't have a real Merchant ID, we'll open the main page or a sample endpoint to simulate the window.
+    // In production, use: `${baseUrl}/pay/YOUR_ID_HERE`
+    const targetUrl = `${baseUrl}`; 
 
-    // SIMULATION: Wait for "payment completion"
-    setTimeout(async () => {
-        // 3. Assume payment success and record the pledge
-        await recordPledge(tier.price, tier.name, phoneNumber, `cider_${Date.now()}`);
-    }, 2500);
+    const popup = window.open(
+        targetUrl, 
+        'CiderPay', 
+        'width=800,height=600,scrollbars=yes,resizable=yes'
+    );
+
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+        alert("Popup blocked! Please allow popups to proceed with payment.");
+    }
+  };
+
+  const handleCiderPayComplete = async () => {
+     const tier = TIERS.find(t => t.id === selectedTier);
+     if(!tier) return;
+
+     setStep('processing');
+     
+     // Simulate server verification delay
+     await new Promise(resolve => setTimeout(resolve, 1000));
+     
+     await recordPledge(tier.price, tier.name, phoneNumber, `cider_${Date.now()}`);
   };
 
   const handleManualConfirm = async () => {
@@ -328,21 +346,38 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
            </div>
         )}
 
-        {/* --- STEP: CIDERPAY PROCESSING (Enhanced UI) --- */}
+        {/* --- STEP: CIDERPAY PROCESSING (Real Window) --- */}
         {step === 'cider_process' && (
            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
              <div className="w-20 h-20 mb-6 bg-blue-50 dark:bg-blue-500/10 rounded-full flex items-center justify-center relative">
                 <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full"></div>
-                <div className="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 <CreditCard size={32} className="text-blue-500" />
              </div>
-             <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Connecting to CiderPay</h3>
-             <p className="text-slate-500 dark:text-gray-400 text-sm mb-8 leading-relaxed max-w-[200px] mx-auto">
-                Securely directing you to the payment gateway...
+             
+             <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Payment Window Open</h3>
+             <p className="text-slate-500 dark:text-gray-400 text-sm mb-6 leading-relaxed max-w-[240px] mx-auto">
+                Please complete the payment in the new popup window.
              </p>
-             <div className="flex items-center gap-2 text-xs text-slate-400 font-medium bg-slate-50 dark:bg-white/5 px-3 py-1.5 rounded-full">
-                <ShieldCheck size={12} className="text-green-500" />
-                TLS Encrypted Connection
+
+             <div className="flex flex-col gap-3 w-full max-w-xs">
+                 <button 
+                    onClick={handleCiderPayComplete}
+                    className="w-full py-4 rounded-xl font-bold text-lg bg-blue-500 text-white shadow-lg shadow-blue-500/30 hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
+                 >
+                    <Check size={20} />
+                    I have completed payment
+                 </button>
+                 
+                 <button 
+                    onClick={() => {
+                        const tier = TIERS.find(t => t.id === selectedTier);
+                        if(tier) startCiderPay(tier);
+                    }}
+                    className="w-full py-3 rounded-xl font-bold text-sm bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-white/20 transition-all flex items-center justify-center gap-2"
+                 >
+                    <MousePointerClick size={16} />
+                    Re-open Window
+                 </button>
              </div>
            </div>
         )}
