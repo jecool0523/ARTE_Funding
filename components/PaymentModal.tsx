@@ -48,6 +48,17 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
+  // Clean up message listener on unmount
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+        if (event.data === 'CIDERPAY_SUCCESS') {
+            handleCiderPayComplete();
+        }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [selectedTier]); // Re-bind if tier changes (for closure context)
+
   const handlePayment = async () => {
     if (!selectedTier) {
         alert("Please select a reward tier.");
@@ -73,24 +84,18 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
   const startCiderPay = async (tier: typeof TIERS[0]) => {
     setStep('cider_process');
     
-    // 1. Open Popup IMMEDIATELY (Synchronously) to prevent browser blocking
-    // Using about:blank initially, then we will redirect it.
-    const popup = window.open(
-        '', 
-        'CiderPay', 
-        'width=800,height=700,scrollbars=yes,resizable=yes'
-    );
-
-    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+    // 1. Open Popup Synchronously (Prevents Browser Block)
+    const popup = window.open('', 'CiderPay', 'width=800,height=700,scrollbars=yes,resizable=yes');
+    if (!popup) {
         alert("Popup blocked! Please allow popups to proceed with payment.");
         return;
     }
 
-    // Show loading state inside the popup while API fetches
+    // 2. Show Initial Loading State in Popup
     popup.document.write(`
         <html>
             <head>
-                <title>Connecting to CiderPay...</title>
+                <title>Connecting...</title>
                 <style>
                     body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f8fafc; margin: 0; }
                     .loader { width: 40px; height: 40px; border: 4px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
@@ -101,64 +106,98 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
             </head>
             <body>
                 <div class="loader"></div>
-                <h3>Secure Payment</h3>
-                <p>Initializing CiderPay Gateway...</p>
+                <h3>Contacting Payment Gateway</h3>
+                <p>Please wait...</p>
             </body>
         </html>
     `);
 
-    // --- API Configuration (Based on PDF Docs) ---
+    // 3. API Configuration
     const API_URL = "https://api.ciderpay.com/oapi/payment/request";
-    // TODO: You must replace these with your actual CiderPay Member ID and Token
-    const MEMBER_ID = "public_test"; // Using public_test for demo
-    const APPROVAL_TOKEN = "test_token"; 
+    // NOTE: In a real app, 'memberID' and 'approvalToken' should be provided by your env variables or backend.
+    const MEMBER_ID = "test_member_id"; // Replace with your actual CiderPay Member ID
+    const APPROVAL_TOKEN = "test_token"; // Replace with actual token if required
 
     try {
-        // 2. Prepare Payload (PDF Page 1 & 6)
+        // Prepare Payload based on Docs (Page 1 & 6)
         const payload = {
             memberID: MEMBER_ID,
             goodName: tier.name,
             price: tier.price,
             mobile: phoneNumber,
-            recvPhone: phoneNumber, // Required in some contexts
-            returnurl: window.location.href, // Return URL
+            returnurl: window.location.href, // CiderPay redirects here after success
+            returnmode: "JUST", // Page 2: Immediately call return URL (good for SPA)
             orderNo: `ORDER_${Date.now()}`,
             taxFreePrice: 0, 
-            taxPrice: Math.round(tier.price / 1.1) // Simple tax calc example
+            taxPrice: Math.round(tier.price / 1.1),
+            smsuse: "N"
         };
 
-        // 3. Call API
-        // NOTE: Direct calls from frontend often fail due to CORS. 
-        // We use a try/catch to fallback to a GET link if the API call fails.
+        // Attempt POST Request
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'approvalToken': APPROVAL_TOKEN // Header as per PDF Page 1
+                'approvalToken': APPROVAL_TOKEN
             },
             body: JSON.stringify(payload)
         });
 
         const data = await response.json();
 
-        // 4. Redirect Popup
+        // 4. Handle Success -> Redirect Popup
         if (data.success && data.payUrl) {
             popup.location.href = data.payUrl;
         } else {
-            console.warn("API Error or Demo Mode:", data);
-            throw new Error("API_FAIL");
+            // API Responded but with logic error (e.g. invalid MemberID)
+            console.warn("CiderPay API Error:", data);
+            popup.document.body.innerHTML = `
+                <div style="text-align:center; padding: 20px;">
+                    <h2 style="color:#ef4444;">Payment Setup Failed</h2>
+                    <p style="color:#64748b;">${data.message || 'The payment gateway rejected the request.'}</p>
+                    <button onclick="window.close()" style="margin-top:20px; padding:10px 20px; border:1px solid #ccc; background:white; cursor:pointer;">Close</button>
+                </div>
+            `;
         }
 
     } catch (e) {
-        console.warn("CiderPay API direct call failed (likely CORS). Switching to Link Payment Fallback.", e);
+        console.warn("CiderPay API Call Failed (likely CORS in local dev). Switching to Simulation Mode.", e);
         
-        // --- FALLBACK STRATEGY ---
-        // If the POST API fails (common in frontend-only), we construct a direct Payment Link.
-        // This ensures the window actually shows a payment page.
-        // Format: https://www.ciderpay.com/pay/{memberID}?goodsName=...&price=...
-        const fallbackUrl = `https://www.ciderpay.com/pay/${MEMBER_ID}?goodsName=${encodeURIComponent(tier.name)}&price=${tier.price}`;
-        
-        popup.location.href = fallbackUrl;
+        // 5. DEMO FALLBACK: Graceful Simulation
+        // Since we can't call the real API from localhost without a proxy/CORS setup,
+        // we show a "Demo Payment" screen instead of a 404 broken link.
+        popup.document.open();
+        popup.document.write(`
+            <html>
+            <head>
+                <title>Payment Simulation</title>
+                <style>
+                    body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #fff; margin: 0; padding: 20px; text-align: center; }
+                    .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 40px; max-width: 400px; width: 100%; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+                    h2 { color: #0f172a; margin-top: 0; }
+                    p { color: #64748b; line-height: 1.5; font-size: 14px; margin-bottom: 24px; }
+                    .btn { background: #3b82f6; color: white; border: none; padding: 12px 24px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; transition: background 0.2s; }
+                    .btn:hover { background: #2563eb; }
+                    .badge { background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-bottom: 16px; display: inline-block; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="badge">DEMO MODE</div>
+                    <h2>Payment Gateway Simulation</h2>
+                    <p>
+                        <strong>Note:</strong> Real API calls require a backend server to handle CORS and security tokens.
+                        <br/><br/>
+                        Since this is a client-side demo, we have simulated the payment window for you.
+                    </p>
+                    <button class="btn" onclick="window.opener.postMessage('CIDERPAY_SUCCESS', '*'); window.close();">
+                        Simulate Payment Success
+                    </button>
+                </div>
+            </body>
+            </html>
+        `);
+        popup.document.close();
     }
   };
 
