@@ -6,7 +6,7 @@ import { PROJECT_DATA } from '../constants';
 const GallerySection = () => {
   return (
     <div className="mb-12">
-      <ScrollReveal>
+      <ScrollReveal variant="left">
         <div className="flex items-center gap-2 mb-6 px-2">
           <span className="flex items-center justify-center w-8 h-8 rounded-full bg-green-500/20 text-green-500">
             <ImageIcon size={18} />
@@ -23,7 +23,12 @@ const GallerySection = () => {
           const isTall = item.size === 'tall';
           
           return (
-            <ScrollReveal key={item.id} delay={index * 100} className={`relative group rounded-2xl overflow-hidden shadow-sm dark:shadow-none bg-slate-200 dark:bg-white/5 ${isLarge ? 'col-span-2 aspect-[16/9]' : isTall ? 'row-span-2 aspect-[3/4]' : 'aspect-square'}`}>
+            <ScrollReveal 
+                key={item.id} 
+                variant="zoom" // Pop effect for images
+                delay={index * 100} 
+                className={`relative group rounded-2xl overflow-hidden shadow-sm dark:shadow-none bg-slate-200 dark:bg-white/5 ${isLarge ? 'col-span-2 aspect-[16/9]' : isTall ? 'row-span-2 aspect-[3/4]' : 'aspect-square'}`}
+            >
               <img 
                 src={item.imageUrl} 
                 alt={item.caption} 
@@ -48,9 +53,11 @@ const GallerySection = () => {
       
       {/* Decorative caption below grid */}
       <div className="mt-3 text-center">
-        <p className="text-[10px] text-slate-400 dark:text-gray-500 font-medium uppercase tracking-widest">
-            Behind The Scenes
-        </p>
+        <ScrollReveal delay={400}>
+            <p className="text-[10px] text-slate-400 dark:text-gray-500 font-medium uppercase tracking-widest">
+                Behind The Scenes
+            </p>
+        </ScrollReveal>
       </div>
     </div>
   );

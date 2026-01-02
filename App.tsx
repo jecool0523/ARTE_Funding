@@ -103,7 +103,7 @@ const App = () => {
         <div className="w-16 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-6 opacity-40"></div>
 
         {/* Title Section */}
-        <ScrollReveal>
+        <ScrollReveal variant="up">
             <div className="text-center mb-8">
                 <div className="inline-flex gap-2 mb-3">
                     {PROJECT_DATA.meta.tags.map(tag => (
@@ -125,9 +125,9 @@ const App = () => {
             </div>
         </ScrollReveal>
 
-        {/* Funding Widget */}
-        <ScrollReveal delay={100}>
-            <div className="bg-white dark:bg-brand-surface p-6 rounded-[2.5rem] shadow-xl dark:shadow-none mb-8 border border-slate-100 dark:border-white/5 overflow-hidden transition-colors duration-300 min-h-[300px] flex items-center justify-center">
+        {/* Funding Widget - ZOOM EFFECT */}
+        <ScrollReveal variant="zoom" delay={150}>
+            <div className="bg-white dark:bg-brand-surface p-6 rounded-[2.5rem] shadow-xl dark:shadow-none mb-8 border border-slate-100 dark:border-white/5 overflow-hidden transition-colors duration-300 min-h-[300px] flex items-center justify-center transform hover:scale-[1.02] transition-transform duration-500">
                 {isLoading ? (
                     <div className="flex flex-col items-center gap-4">
                         <div className="w-12 h-12 border-4 border-brand-pink border-t-transparent rounded-full animate-spin"></div>
@@ -139,8 +139,10 @@ const App = () => {
             </div>
         </ScrollReveal>
 
-        {/* Navigation */}
-        <TabNav activeTab={activeTab} setActiveTab={setActiveTab} />
+        {/* Navigation - Slide in from Left */}
+        <ScrollReveal variant="left" delay={200}>
+             <TabNav activeTab={activeTab} setActiveTab={setActiveTab} />
+        </ScrollReveal>
 
         {/* Dynamic Content based on Tab */}
         <div>
@@ -149,12 +151,12 @@ const App = () => {
             <SynopsisSection />
 
             {/* Cast Section */}
-            <ScrollReveal>
+            <ScrollReveal variant="up">
                 <CastCarousel />
             </ScrollReveal>
 
-            {/* Venue Section */}
-            <ScrollReveal>
+            {/* Venue Section - ZOOM */}
+            <ScrollReveal variant="zoom">
                 <div className="mb-10">
                     <div className="flex items-center gap-2 mb-4 px-2">
                         <span className="flex items-center justify-center w-8 h-8 rounded-full bg-yellow-500/20 text-yellow-500">
