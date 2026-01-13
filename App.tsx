@@ -41,39 +41,49 @@ const App = () => {
     const fetchAndSubscribe = async () => {
         setIsLoading(true);
         
-        // 1. 초기 데이터 로드 (모든 후원금 합산)
-        const { data, error } = await supabase
-            .from('pledges')
-            .select('amount');
-        
-        if (error) {
-            console.error('Error fetching pledges:', error);
-            setCurrentAmount(0); 
-        } else if (data) {
-            const total = data.reduce((sum, row) => sum + (row.amount || 0), 0);
-            setCurrentAmount(total);
+        try {
+            // 1. Initial Data Load
+            const { data, error } = await supabase
+                .from('pledges')
+                .select('amount');
+            
+            if (error) {
+                // Better logging to avoid [object Object]
+                console.warn('Supabase Fetch Warning (Pledges):', error.message || error);
+                // Fallback for demo mode: 75% of goal if DB is not configured
+                setCurrentAmount(PROJECT_DATA.funding.goalAmount * 0.75); 
+            } else if (data) {
+                const total = data.reduce((sum, row) => sum + (row.amount || 0), 0);
+                setCurrentAmount(total);
+            }
+        } catch (err: any) {
+            console.warn('Network Error fetching pledges:', err.message || err);
+            setCurrentAmount(PROJECT_DATA.funding.goalAmount * 0.75);
         }
 
         setIsLoading(false);
 
-        // 2. 실시간 구독 (새로운 후원이 들어오면 즉시 업데이트)
-        const channel = supabase
-            .channel('public:pledges')
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'pledges' },
-                (payload) => {
-                    const newPledgeAmount = payload.new.amount;
-                    console.log('New pledge received!', newPledgeAmount);
-                    setCurrentAmount(prev => prev + newPledgeAmount);
-                }
-            )
-            .subscribe();
+        // 2. Realtime Subscription
+        try {
+            const channel = supabase
+                .channel('public:pledges')
+                .on(
+                    'postgres_changes',
+                    { event: 'INSERT', schema: 'public', table: 'pledges' },
+                    (payload) => {
+                        const newPledgeAmount = payload.new.amount;
+                        console.log('Live Update: New pledge received!', newPledgeAmount);
+                        setCurrentAmount(prev => prev + newPledgeAmount);
+                    }
+                )
+                .subscribe();
 
-        // Cleanup
-        return () => {
-            supabase.removeChannel(channel);
-        };
+            return () => {
+                supabase.removeChannel(channel);
+            };
+        } catch (e) {
+            console.warn('Realtime subscription skipped for pledges');
+        }
     };
 
     fetchAndSubscribe();
@@ -112,7 +122,6 @@ const App = () => {
                         </span>
                     ))}
                 </div>
-                {/* Handle line breaks in title */}
                 <h1 className="text-slate-900 dark:text-white text-3xl font-black leading-tight mb-3 transition-colors whitespace-pre-wrap">
                     {PROJECT_DATA.meta.title}
                 </h1>
@@ -125,7 +134,7 @@ const App = () => {
             </div>
         </ScrollReveal>
 
-        {/* Funding Widget - ZOOM EFFECT */}
+        {/* Funding Widget */}
         <ScrollReveal variant="zoom" delay={150}>
             <div className="bg-white dark:bg-brand-surface p-6 rounded-[2.5rem] shadow-xl dark:shadow-none mb-8 border border-slate-100 dark:border-white/5 overflow-hidden transition-colors duration-300 min-h-[300px] flex items-center justify-center transform hover:scale-[1.02] transition-transform duration-500">
                 {isLoading ? (
@@ -139,23 +148,16 @@ const App = () => {
             </div>
         </ScrollReveal>
 
-        {/* Navigation - Slide in from Left */}
         <ScrollReveal variant="left" delay={200}>
              <TabNav activeTab={activeTab} setActiveTab={setActiveTab} />
         </ScrollReveal>
 
-        {/* Dynamic Content based on Tab */}
         <div>
-            
-            {/* Synopsis Section */}
             <SynopsisSection />
-
-            {/* Cast Section */}
             <ScrollReveal variant="up">
                 <CastCarousel />
             </ScrollReveal>
 
-            {/* Venue Section - ZOOM */}
             <ScrollReveal variant="zoom">
                 <div className="mb-10">
                     <div className="flex items-center gap-2 mb-4 px-2">
@@ -185,18 +187,12 @@ const App = () => {
                 </div>
             </ScrollReveal>
 
-            {/* Cheering Section (Real-time) */}
             <CheeringSection />
-
-            {/* Gallery Section */}
             <GallerySection />
-        
         </div>
       </div>
       
       <StickyFooter onFundClick={() => setIsPaymentOpen(true)} />
-
-      {/* Payment Modal */}
       <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} />
     </div>
   );

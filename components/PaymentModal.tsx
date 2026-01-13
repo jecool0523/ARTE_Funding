@@ -54,27 +54,24 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
         if (!tier) return;
 
         try {
-          // SDK v2 Client Key from Toss Docs
           const clientKey = "test_gck_docs_Ovk5rk1EwkeBP0W43n07x1zm";
-          const customerKey = "ANONYMOUS"; // Anonymous for simplicity in demo
+          const customerKey = "ANONYMOUS"; 
           
           const tossPayments = await window.TossPayments(clientKey);
           const paymentWidget = tossPayments.paymentWidget({ customerKey });
           paymentWidgetRef.current = paymentWidget;
 
-          // Render Payment Methods
           await paymentWidget.renderPaymentMethods(
             "#payment-method", 
             { value: tier.price },
             { variantKey: "DEFAULT" }
           );
 
-          // Render Agreement
           agreementRef.current = await paymentWidget.renderAgreement("#agreement", { variantKey: "AGREEMENT" });
           
           setIsWidgetLoading(false);
-        } catch (error) {
-          console.error("Toss Widget Init Error:", error);
+        } catch (error: any) {
+          console.error("Toss Widget Init Error:", error.message || error);
           setIsWidgetLoading(false);
         }
       };
@@ -103,7 +100,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
     if (!tier) return;
 
     try {
-      // requestPayment call
       await paymentWidgetRef.current.requestPayment({
         orderId: `ORDER_${Date.now()}`,
         orderName: tier.name,
@@ -112,14 +108,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
         successUrl: window.location.origin + "?payment=success",
         failUrl: window.location.origin + "?payment=fail",
       });
-      
-      // Since this is a redirect based payment, we usually don't reach here 
-      // unless there's an error before redirect.
     } catch (error: any) {
-      if (error.code === 'USER_CANCEL') {
-        // User closed the window
-      } else {
-        alert(error.message);
+      if (error.code !== 'USER_CANCEL') {
+        alert(error.message || "Payment request failed.");
       }
     }
   };
@@ -138,9 +129,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
         const { error: dbError } = await supabase
             .from('pledges')
             .insert([{ amount, tier_name: tierName, mobile, payment_id: paymentId }]);
-        if (dbError) console.warn('Supabase Insert Warning:', dbError);
-    } catch (e) {
-        console.error("Critical DB error", e);
+        if (dbError) console.warn('Supabase DB Warning:', dbError.message);
+    } catch (e: any) {
+        console.error("Critical DB error", e.message || e);
     } finally {
         setStep('success');
     }
@@ -159,7 +150,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
 
       <div className="relative w-full max-w-md bg-white dark:bg-brand-surface rounded-t-3xl sm:rounded-3xl border-t sm:border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden animate-float-up pointer-events-auto flex flex-col max-h-[90vh] sm:max-h-[85vh] transition-colors duration-300">
         
-        {/* STEP 1: SELECTION */}
         {step === 'select' && (
           <>
             <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100 dark:border-white/5 shrink-0 bg-white dark:bg-brand-surface z-10">
@@ -240,7 +230,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
           </>
         )}
 
-        {/* STEP: TOSS WIDGET */}
         {step === 'toss_widget' && (
           <div className="flex-1 flex flex-col">
             <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100 dark:border-white/5 shrink-0 z-10">
@@ -250,7 +239,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
-                {/* Toss Widget Containers */}
                 <div id="payment-method" className="w-full min-h-[300px]">
                     {isWidgetLoading && (
                         <div className="flex flex-col items-center justify-center h-[300px] animate-pulse">
@@ -277,7 +265,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
           </div>
         )}
 
-        {/* STEP: BANK INFO */}
         {step === 'bank_info' && selectedTier && (
            <div className="flex-1 flex flex-col">
              <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100 dark:border-white/5 shrink-0 z-10">
@@ -309,7 +296,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
            </div>
         )}
 
-        {/* STEP: PROCESSING */}
         {step === 'processing' && (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
             <div className="relative mb-8">
@@ -323,7 +309,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
           </div>
         )}
 
-        {/* STEP: SUCCESS */}
         {step === 'success' && (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
              <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center text-white shadow-2xl shadow-green-500/30 mb-6 animate-[bounce_1s_infinite]">
