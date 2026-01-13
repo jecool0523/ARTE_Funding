@@ -15,7 +15,7 @@ export const PROJECT_DATA: ProjectData = {
     // MediaUrl is for the poster image (displayed before video loads or on error)
     mediaUrl: "https://picsum.photos/800/1200?random=101",
     // VideoUrl for the local file
-    videoUrl: VIDEO_PATH, 
+    videoUrl: VIDEO_PATH,
     badge: "D-1 PREMIERE"
   },
   funding: {
