@@ -34,8 +34,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
   const [isWidgetLoading, setIsWidgetLoading] = useState(false);
   
   // Toss Refs
-  const paymentWidgetRef = useRef<any>(null);
-  const agreementRef = useRef<any>(null);
+  const widgetsRef = useRef<any>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -45,7 +44,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  // Toss Widget Initialization
+  // Toss Widget Initialization (v2 Standard SDK style)
   useEffect(() => {
     if (step === 'toss_widget' && selectedTier) {
       const initTossWidget = async () => {
@@ -54,20 +53,31 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
         if (!tier) return;
 
         try {
+          // Toss SDK v2 uses widgets() instead of paymentWidget()
           const clientKey = "test_gck_docs_Ovk5rk1EwkeBP0W43n07x1zm";
           const customerKey = "ANONYMOUS"; 
           
           const tossPayments = await window.TossPayments(clientKey);
-          const paymentWidget = tossPayments.paymentWidget({ customerKey });
-          paymentWidgetRef.current = paymentWidget;
+          const widgets = tossPayments.widgets({ customerKey });
+          widgetsRef.current = widgets;
 
-          await paymentWidget.renderPaymentMethods(
-            "#payment-method", 
-            { value: tier.price },
-            { variantKey: "DEFAULT" }
-          );
+          // In v2, we must set the amount before rendering
+          await widgets.setAmount({ 
+            currency: "KRW", 
+            value: tier.price 
+          });
 
-          agreementRef.current = await paymentWidget.renderAgreement("#agreement", { variantKey: "AGREEMENT" });
+          // Render Payment Methods with selector object
+          await widgets.renderPaymentMethods({
+            selector: "#payment-method",
+            variantKey: "DEFAULT"
+          });
+
+          // Render Agreement with selector object
+          await widgets.renderAgreement({ 
+            selector: "#agreement", 
+            variantKey: "AGREEMENT" 
+          });
           
           setIsWidgetLoading(false);
         } catch (error: any) {
@@ -94,13 +104,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleTossPayment = async () => {
-    if (!paymentWidgetRef.current) return;
+    if (!widgetsRef.current) return;
     
     const tier = TIERS.find(t => t.id === selectedTier);
     if (!tier) return;
 
     try {
-      await paymentWidgetRef.current.requestPayment({
+      // Use the widgets instance to request payment in v2
+      await widgetsRef.current.requestPayment({
         orderId: `ORDER_${Date.now()}`,
         orderName: tier.name,
         customerName: "Patron",
