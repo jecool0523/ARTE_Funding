@@ -1,6 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { X, Check, CreditCard, ShieldCheck, Phone, Landmark, Copy, Loader2, MousePointerClick } from 'lucide-react';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Check, CreditCard, ShieldCheck, Phone, Landmark, Copy, Loader2, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+
+// Toss Payments Type Definitions (Global window)
+declare global {
+  interface Window {
+    TossPayments: any;
+  }
+}
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -13,21 +21,6 @@ const TIERS = [
   { id: 3, name: 'Angel Investor', price: 300000, desc: '2x VIP Tickets + Name on Seat + Merch Set' },
 ];
 
-const PAYMENT_METHODS = [
-  { 
-    id: 'ciderpay', 
-    name: 'CiderPay', 
-    description: 'Credit Card / Mobile',
-    icon: <CreditCard size={20} className="text-blue-500" /> 
-  },
-  { 
-    id: 'manual', 
-    name: 'Bank Transfer', 
-    description: 'Direct Deposit',
-    icon: <Landmark size={20} className="text-slate-500" /> 
-  },
-];
-
 const BANK_INFO = {
   bankName: "Kakao Bank",
   accountNumber: "3333-00-1234567",
@@ -35,10 +28,14 @@ const BANK_INFO = {
 };
 
 const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
-  const [step, setStep] = useState<'select' | 'bank_info' | 'cider_process' | 'processing' | 'success'>('select');
+  const [step, setStep] = useState<'select' | 'bank_info' | 'toss_widget' | 'processing' | 'success'>('select');
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
-  const [selectedMethodId, setSelectedMethodId] = useState<string>('ciderpay');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [isWidgetLoading, setIsWidgetLoading] = useState(false);
+  
+  // Toss Refs
+  const paymentWidgetRef = useRef<any>(null);
+  const agreementRef = useRef<any>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -48,169 +45,83 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  // Clean up message listener on unmount
+  // Toss Widget Initialization
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-        if (event.data === 'CIDERPAY_SUCCESS') {
-            handleCiderPayComplete();
-        }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [selectedTier]); // Re-bind if tier changes (for closure context)
+    if (step === 'toss_widget' && selectedTier) {
+      const initTossWidget = async () => {
+        setIsWidgetLoading(true);
+        const tier = TIERS.find(t => t.id === selectedTier);
+        if (!tier) return;
 
-  const handlePayment = async () => {
+        try {
+          // SDK v2 Client Key from Toss Docs
+          const clientKey = "test_gck_docs_Ovk5rk1EwkeBP0W43n07x1zm";
+          const customerKey = "ANONYMOUS"; // Anonymous for simplicity in demo
+          
+          const tossPayments = await window.TossPayments(clientKey);
+          const paymentWidget = tossPayments.paymentWidget({ customerKey });
+          paymentWidgetRef.current = paymentWidget;
+
+          // Render Payment Methods
+          await paymentWidget.renderPaymentMethods(
+            "#payment-method", 
+            { value: tier.price },
+            { variantKey: "DEFAULT" }
+          );
+
+          // Render Agreement
+          agreementRef.current = await paymentWidget.renderAgreement("#agreement", { variantKey: "AGREEMENT" });
+          
+          setIsWidgetLoading(false);
+        } catch (error) {
+          console.error("Toss Widget Init Error:", error);
+          setIsWidgetLoading(false);
+        }
+      };
+
+      initTossWidget();
+    }
+  }, [step, selectedTier]);
+
+  const handleNextStep = () => {
     if (!selectedTier) {
-        alert("Please select a reward tier.");
-        return;
+      alert("Please select a reward tier.");
+      return;
     }
     if (!phoneNumber || phoneNumber.length < 10) {
-        alert("Please enter a valid mobile number.");
-        return;
+      alert("Please enter a valid mobile number.");
+      return;
     }
 
+    setStep('toss_widget');
+  };
+
+  const handleTossPayment = async () => {
+    if (!paymentWidgetRef.current) return;
+    
     const tier = TIERS.find(t => t.id === selectedTier);
     if (!tier) return;
 
-    // --- Logic Switch ---
-    if (selectedMethodId === 'manual') {
-        setStep('bank_info');
-    } else {
-        // Start CiderPay Flow
-        startCiderPay(tier);
-    }
-  };
-
-  const startCiderPay = async (tier: typeof TIERS[0]) => {
-    setStep('cider_process');
-    
-    // 1. Open Popup Synchronously (Prevents Browser Block)
-    const popup = window.open('', 'CiderPay', 'width=800,height=700,scrollbars=yes,resizable=yes');
-    if (!popup) {
-        alert("Popup blocked! Please allow popups to proceed with payment.");
-        return;
-    }
-
-    // 2. Show Initial Loading State in Popup
-    popup.document.write(`
-        <html>
-            <head>
-                <title>Connecting...</title>
-                <style>
-                    body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f8fafc; margin: 0; }
-                    .loader { width: 40px; height: 40px; border: 4px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
-                    @keyframes spin { to { transform: rotate(360deg); } }
-                    h3 { color: #1e293b; margin: 0 0 8px 0; }
-                    p { color: #64748b; font-size: 14px; margin: 0; }
-                </style>
-            </head>
-            <body>
-                <div class="loader"></div>
-                <h3>Contacting Payment Gateway</h3>
-                <p>Please wait...</p>
-            </body>
-        </html>
-    `);
-
-    // 3. API Configuration
-    const API_URL = "https://api.ciderpay.com/oapi/payment/request";
-    // NOTE: In a real app, 'memberID' and 'approvalToken' should be provided by your env variables or backend.
-    const MEMBER_ID = "test_member_id"; // Replace with your actual CiderPay Member ID
-    const APPROVAL_TOKEN = "test_token"; // Replace with actual token if required
-
     try {
-        // Prepare Payload based on Docs (Page 1 & 6)
-        const payload = {
-            memberID: MEMBER_ID,
-            goodName: tier.name,
-            price: tier.price,
-            mobile: phoneNumber,
-            returnurl: window.location.href, // CiderPay redirects here after success
-            returnmode: "JUST", // Page 2: Immediately call return URL (good for SPA)
-            orderNo: `ORDER_${Date.now()}`,
-            taxFreePrice: 0, 
-            taxPrice: Math.round(tier.price / 1.1),
-            smsuse: "N"
-        };
-
-        // Attempt POST Request
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'approvalToken': APPROVAL_TOKEN
-            },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await response.json();
-
-        // 4. Handle Success -> Redirect Popup
-        if (data.success && data.payUrl) {
-            popup.location.href = data.payUrl;
-        } else {
-            // API Responded but with logic error (e.g. invalid MemberID)
-            console.warn("CiderPay API Error:", data);
-            popup.document.body.innerHTML = `
-                <div style="text-align:center; padding: 20px;">
-                    <h2 style="color:#ef4444;">Payment Setup Failed</h2>
-                    <p style="color:#64748b;">${data.message || 'The payment gateway rejected the request.'}</p>
-                    <button onclick="window.close()" style="margin-top:20px; padding:10px 20px; border:1px solid #ccc; background:white; cursor:pointer;">Close</button>
-                </div>
-            `;
-        }
-
-    } catch (e) {
-        console.warn("CiderPay API Call Failed (likely CORS in local dev). Switching to Simulation Mode.", e);
-        
-        // 5. DEMO FALLBACK: Graceful Simulation
-        // Since we can't call the real API from localhost without a proxy/CORS setup,
-        // we show a "Demo Payment" screen instead of a 404 broken link.
-        popup.document.open();
-        popup.document.write(`
-            <html>
-            <head>
-                <title>Payment Simulation</title>
-                <style>
-                    body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #fff; margin: 0; padding: 20px; text-align: center; }
-                    .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 40px; max-width: 400px; width: 100%; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-                    h2 { color: #0f172a; margin-top: 0; }
-                    p { color: #64748b; line-height: 1.5; font-size: 14px; margin-bottom: 24px; }
-                    .btn { background: #3b82f6; color: white; border: none; padding: 12px 24px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; transition: background 0.2s; }
-                    .btn:hover { background: #2563eb; }
-                    .badge { background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-bottom: 16px; display: inline-block; }
-                </style>
-            </head>
-            <body>
-                <div class="card">
-                    <div class="badge">DEMO MODE</div>
-                    <h2>Payment Gateway Simulation</h2>
-                    <p>
-                        <strong>Note:</strong> Real API calls require a backend server to handle CORS and security tokens.
-                        <br/><br/>
-                        Since this is a client-side demo, we have simulated the payment window for you.
-                    </p>
-                    <button class="btn" onclick="window.opener.postMessage('CIDERPAY_SUCCESS', '*'); window.close();">
-                        Simulate Payment Success
-                    </button>
-                </div>
-            </body>
-            </html>
-        `);
-        popup.document.close();
+      // requestPayment call
+      await paymentWidgetRef.current.requestPayment({
+        orderId: `ORDER_${Date.now()}`,
+        orderName: tier.name,
+        customerName: "Patron",
+        customerMobilePhone: phoneNumber,
+        successUrl: window.location.origin + "?payment=success",
+        failUrl: window.location.origin + "?payment=fail",
+      });
+      
+      // Since this is a redirect based payment, we usually don't reach here 
+      // unless there's an error before redirect.
+    } catch (error: any) {
+      if (error.code === 'USER_CANCEL') {
+        // User closed the window
+      } else {
+        alert(error.message);
+      }
     }
-  };
-
-  const handleCiderPayComplete = async () => {
-     const tier = TIERS.find(t => t.id === selectedTier);
-     if(!tier) return;
-
-     setStep('processing');
-     
-     // Simulate server verification delay
-     await new Promise(resolve => setTimeout(resolve, 1000));
-     
-     await recordPledge(tier.price, tier.name, phoneNumber, `cider_${Date.now()}`);
   };
 
   const handleManualConfirm = async () => {
@@ -218,36 +129,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
     if (!tier) return;
 
     setStep('processing');
-    
-    // Simulate network delay for UX
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Record as manual payment
     await recordPledge(tier.price, tier.name, phoneNumber, `manual_${Date.now()}`);
   };
 
   const recordPledge = async (amount: number, tierName: string, mobile: string, paymentId: string) => {
     try {
-        // Attempt to save to Supabase
         const { error: dbError } = await supabase
             .from('pledges')
-            .insert([
-                { 
-                    amount: amount, 
-                    tier_name: tierName, 
-                    mobile: mobile,
-                    payment_id: paymentId
-                }
-            ]);
-
-        if (dbError) {
-            console.warn('Supabase Insert Warning:', dbError);
-            console.warn('Proceeding to success state despite DB error (Demo Mode)');
-        }
+            .insert([{ amount, tier_name: tierName, mobile, payment_id: paymentId }]);
+        if (dbError) console.warn('Supabase Insert Warning:', dbError);
     } catch (e) {
-        console.error("Critical DB connection error", e);
+        console.error("Critical DB error", e);
     } finally {
-        // Always show success screen to user in this demo
         setStep('success');
     }
   };
@@ -261,36 +155,24 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center pointer-events-none">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity pointer-events-auto"
-        onClick={onClose}
-      ></div>
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity pointer-events-auto" onClick={onClose}></div>
 
-      {/* Modal Content */}
       <div className="relative w-full max-w-md bg-white dark:bg-brand-surface rounded-t-3xl sm:rounded-3xl border-t sm:border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden animate-float-up pointer-events-auto flex flex-col max-h-[90vh] sm:max-h-[85vh] transition-colors duration-300">
         
-        {/* --- STEP 1: SELECTION --- */}
+        {/* STEP 1: SELECTION */}
         {step === 'select' && (
           <>
-            {/* Header (Fixed) */}
-            <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100 dark:border-white/5 shrink-0 bg-white dark:bg-brand-surface z-10 transition-colors">
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100 dark:border-white/5 shrink-0 bg-white dark:bg-brand-surface z-10">
                 <div>
                     <h2 className="text-xl font-black text-slate-900 dark:text-white">Select Reward</h2>
-                    <p className="text-slate-500 dark:text-gray-400 text-xs">Choose your funding tier</p>
+                    <p className="text-slate-500 dark:text-gray-400 text-xs">Choose your support tier</p>
                 </div>
-                <button 
-                  onClick={onClose}
-                  className="p-2 -mr-2 text-slate-400 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-white/5 rounded-full transition-colors"
-                >
+                <button onClick={onClose} className="p-2 -mr-2 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-white/5 rounded-full transition-colors">
                   <X size={20} />
                 </button>
             </div>
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                
-                {/* Tiers */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
                 <div className="space-y-3">
                   {TIERS.map((tier) => (
                     <div 
@@ -308,9 +190,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
                           </div>
                       )}
                       <div className="flex justify-between items-start pr-6">
-                        <div className={`text-sm font-bold ${selectedTier === tier.id ? 'text-brand-pink' : 'text-slate-900 dark:text-white'}`}>
-                          {tier.name}
-                        </div>
+                        <div className={`text-sm font-bold ${selectedTier === tier.id ? 'text-brand-pink' : 'text-slate-900 dark:text-white'}`}>{tier.name}</div>
                         <div className="font-bold text-slate-900 dark:text-white whitespace-nowrap">₩{tier.price.toLocaleString()}</div>
                       </div>
                       <div className="text-xs text-slate-500 dark:text-gray-400 leading-relaxed">{tier.desc}</div>
@@ -318,7 +198,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
                   ))}
                 </div>
 
-                {/* Mobile Number Input */}
                 <div>
                     <label className="block text-xs font-bold text-slate-500 dark:text-gray-300 mb-2 uppercase tracking-wide">Mobile Number</label>
                     <div className="relative">
@@ -327,198 +206,132 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
                         </div>
                         <input 
                             type="tel"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
                             placeholder="010-0000-0000"
                             value={phoneNumber}
                             onChange={(e) => setPhoneNumber(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-brand-dark border border-slate-200 dark:border-white/10 rounded-xl py-4 pl-10 pr-4 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-600 focus:outline-none focus:border-brand-pink focus:ring-1 focus:ring-brand-pink transition-all text-lg font-medium"
+                            className="w-full bg-slate-50 dark:bg-brand-dark border border-slate-200 dark:border-white/10 rounded-xl py-4 pl-10 pr-4 text-slate-900 dark:text-white focus:outline-none focus:border-brand-pink transition-all text-lg font-medium"
                         />
                     </div>
-                    <p className="text-[10px] text-slate-400 dark:text-gray-500 mt-2 ml-1 flex items-center gap-1">
-                        <ShieldCheck size={10} /> Required for digital receipt
-                    </p>
                 </div>
 
-                {/* Payment Method Selection */}
-                <div>
-                   <h3 className="text-xs font-bold text-slate-500 dark:text-gray-300 mb-3 uppercase tracking-wide">Payment Method</h3>
-                   <div className="grid grid-cols-2 gap-3">
-                     {PAYMENT_METHODS.map((method) => (
-                       <button
-                         key={method.id}
-                         onClick={() => setSelectedMethodId(method.id)}
-                         className={`p-4 rounded-xl border text-left transition-all ${
-                           selectedMethodId === method.id
-                           ? 'bg-white text-brand-dark border-brand-pink ring-1 ring-brand-pink shadow-md'
-                           : 'bg-slate-50 dark:bg-white/5 text-slate-400 dark:text-gray-400 border-transparent hover:bg-slate-100 dark:hover:bg-white/10'
-                         }`}
-                       >
-                         <div className="flex items-center gap-3 mb-1">
-                            {method.icon}
-                            <span className={`text-sm font-bold ${selectedMethodId === method.id ? 'text-slate-900 dark:text-white' : ''}`}>{method.name}</span>
-                         </div>
-                         <div className="text-[10px] opacity-70 pl-8">{method.description}</div>
-                       </button>
-                     ))}
-                   </div>
+                <div className="pt-2">
+                   <button
+                    onClick={() => setStep('bank_info')}
+                    className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
+                   >
+                     <Landmark size={14} /> Prefer Bank Transfer?
+                   </button>
                 </div>
             </div>
 
-            {/* Footer (Fixed) */}
-            <div className="p-4 bg-white dark:bg-brand-surface border-t border-slate-100 dark:border-white/5 shrink-0 pb-8 sm:pb-4 transition-colors">
+            <div className="p-4 bg-white dark:bg-brand-surface border-t border-slate-100 dark:border-white/5 shrink-0 pb-8 sm:pb-4">
                 <button
                   disabled={!selectedTier || !phoneNumber}
-                  onClick={handlePayment}
+                  onClick={handleNextStep}
                   className={`w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 ${
                     selectedTier && phoneNumber
-                    ? 'bg-brand-pink text-white shadow-lg shadow-brand-pink/30 hover:brightness-110 active:scale-[0.98]' 
-                    : 'bg-slate-200 dark:bg-gray-700 text-slate-400 dark:text-gray-500 cursor-not-allowed'
+                    ? 'bg-slate-900 dark:bg-white text-white dark:text-brand-dark shadow-xl hover:scale-[1.02]' 
+                    : 'bg-slate-200 dark:bg-gray-700 text-slate-400 cursor-not-allowed'
                   }`}
                 >
-                  {selectedTier ? (
-                      <>
-                        <span>{selectedMethodId === 'manual' ? 'Next' : 'Pay Now'}</span>
-                        <span className="bg-black/20 px-2 py-0.5 rounded text-sm">₩{TIERS.find(t => t.id === selectedTier)?.price.toLocaleString()}</span>
-                      </>
-                  ) : 'Select Reward & Info'}
+                  Continue to Payment
                 </button>
-                <div className="text-center mt-3 text-[10px] text-slate-400 dark:text-gray-500 flex items-center justify-center gap-1">
-                    <ShieldCheck size={10} /> Secured by {selectedMethodId === 'ciderpay' ? 'CiderPay' : 'Direct Transfer'}
-                </div>
             </div>
           </>
         )}
 
-        {/* --- STEP 1.5: BANK INFO (Manual Transfer) --- */}
+        {/* STEP: TOSS WIDGET */}
+        {step === 'toss_widget' && (
+          <div className="flex-1 flex flex-col">
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100 dark:border-white/5 shrink-0 z-10">
+                <button onClick={() => setStep('select')} className="text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm font-bold transition-colors">← Back</button>
+                <h2 className="text-lg font-black text-slate-900 dark:text-white">Secure Checkout</h2>
+                <div className="w-8"></div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
+                {/* Toss Widget Containers */}
+                <div id="payment-method" className="w-full min-h-[300px]">
+                    {isWidgetLoading && (
+                        <div className="flex flex-col items-center justify-center h-[300px] animate-pulse">
+                            <div className="w-10 h-10 border-4 border-slate-200 border-t-brand-pink rounded-full animate-spin mb-4"></div>
+                            <p className="text-xs text-slate-400">Loading Payment Methods...</p>
+                        </div>
+                    )}
+                </div>
+                <div id="agreement" className="w-full"></div>
+            </div>
+
+            <div className="p-4 bg-white dark:bg-brand-surface border-t border-slate-100 dark:border-white/5 shrink-0 pb-8 sm:pb-4">
+                <button
+                  onClick={handleTossPayment}
+                  className="w-full py-4 rounded-xl font-bold text-lg bg-[#3182f6] text-white shadow-lg shadow-blue-500/20 hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={20} />
+                  Pay Now
+                </button>
+                <p className="text-center mt-3 text-[10px] text-slate-400 flex items-center justify-center gap-1">
+                    <ShieldCheck size={10} /> Secured by Toss Payments
+                </p>
+            </div>
+          </div>
+        )}
+
+        {/* STEP: BANK INFO */}
         {step === 'bank_info' && selectedTier && (
            <div className="flex-1 flex flex-col">
              <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100 dark:border-white/5 shrink-0 z-10">
-                <button 
-                  onClick={() => setStep('select')}
-                  className="p-2 -ml-2 text-slate-400 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white rounded-full transition-colors font-bold text-sm"
-                >
-                  ← Back
-                </button>
+                <button onClick={() => setStep('select')} className="text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm font-bold transition-colors">← Back</button>
                 <h2 className="text-lg font-black text-slate-900 dark:text-white">Bank Transfer</h2>
                 <div className="w-8"></div>
              </div>
-
-             <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto">
+             <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto no-scrollbar">
                 <div className="bg-slate-50 dark:bg-white/5 rounded-2xl p-6 border border-slate-200 dark:border-white/10 text-center">
                     <p className="text-slate-500 dark:text-gray-400 text-sm mb-1">Transfer Amount</p>
                     <p className="text-3xl font-black text-brand-pink mb-4">₩{TIERS.find(t => t.id === selectedTier)?.price.toLocaleString()}</p>
                     <div className="h-px w-full bg-slate-200 dark:bg-white/10 my-4"></div>
                     <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <span className="text-slate-500 dark:text-gray-400 text-sm">Bank</span>
-                            <span className="font-bold text-slate-900 dark:text-white">{BANK_INFO.bankName}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-slate-500 dark:text-gray-400 text-sm">Account Holder</span>
-                            <span className="font-bold text-slate-900 dark:text-white">{BANK_INFO.holder}</span>
-                        </div>
+                        <div className="flex justify-between items-center"><span className="text-slate-500 text-sm">Bank</span><span className="font-bold dark:text-white">{BANK_INFO.bankName}</span></div>
+                        <div className="flex justify-between items-center"><span className="text-slate-500 text-sm">Account Holder</span><span className="font-bold dark:text-white">{BANK_INFO.holder}</span></div>
                         <div className="flex flex-col gap-2 mt-2">
-                             <span className="text-slate-500 dark:text-gray-400 text-xs uppercase tracking-wide">Account Number</span>
-                             <button 
-                                onClick={() => copyToClipboard(BANK_INFO.accountNumber)}
-                                className="flex items-center justify-between bg-white dark:bg-black/20 border-2 border-slate-200 dark:border-white/10 rounded-xl p-3 hover:border-brand-pink transition-colors group"
-                             >
-                                 <span className="font-mono font-bold text-lg text-slate-900 dark:text-white tracking-wider">{BANK_INFO.accountNumber}</span>
-                                 <span className="text-slate-400 group-hover:text-brand-pink"><Copy size={18} /></span>
+                             <span className="text-slate-500 text-[10px] uppercase tracking-wide">Account Number</span>
+                             <button onClick={() => copyToClipboard(BANK_INFO.accountNumber)} className="flex items-center justify-between bg-white dark:bg-black/20 border-2 border-slate-200 dark:border-white/10 rounded-xl p-3 hover:border-brand-pink transition-colors group">
+                                 <span className="font-mono font-bold text-lg dark:text-white tracking-wider">{BANK_INFO.accountNumber}</span>
+                                 <Copy size={18} className="text-slate-400 group-hover:text-brand-pink" />
                              </button>
                         </div>
                     </div>
                 </div>
-
-                <div className="bg-blue-50 dark:bg-blue-500/10 p-4 rounded-xl flex gap-3 items-start">
-                    <div className="bg-blue-100 dark:bg-blue-500/20 p-2 rounded-full text-blue-600 dark:text-blue-400 shrink-0">
-                        <ShieldCheck size={18} />
-                    </div>
-                    <div className="text-sm text-blue-800 dark:text-blue-100 leading-relaxed">
-                        <p className="font-bold mb-1">Important</p>
-                        Please transfer the exact amount. Your pledge will be confirmed automatically once we verify the transaction (usually within 1 hour).
-                    </div>
-                </div>
              </div>
-
-             <div className="p-4 bg-white dark:bg-brand-surface border-t border-slate-100 dark:border-white/5 shrink-0 pb-8 sm:pb-4 transition-colors">
-                <button
-                  onClick={handleManualConfirm}
-                  className="w-full py-4 rounded-xl font-bold text-lg bg-brand-pink text-white shadow-lg shadow-brand-pink/30 hover:brightness-110 active:scale-[0.98] transition-all"
-                >
-                  I have transferred
-                </button>
+             <div className="p-4 bg-white dark:bg-brand-surface border-t border-slate-100 dark:border-white/5 shrink-0 pb-8 sm:pb-4">
+                <button onClick={handleManualConfirm} className="w-full py-4 rounded-xl font-bold text-lg bg-brand-pink text-white shadow-lg shadow-brand-pink/30 hover:brightness-110 active:scale-[0.98] transition-all">I have transferred</button>
              </div>
            </div>
         )}
 
-        {/* --- STEP: CIDERPAY PROCESSING (Real Window) --- */}
-        {step === 'cider_process' && (
-           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
-             <div className="w-20 h-20 mb-6 bg-blue-50 dark:bg-blue-500/10 rounded-full flex items-center justify-center relative">
-                <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full"></div>
-                <CreditCard size={32} className="text-blue-500" />
-             </div>
-             
-             <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Payment Window Open</h3>
-             <p className="text-slate-500 dark:text-gray-400 text-sm mb-6 leading-relaxed max-w-[240px] mx-auto">
-                Please complete the payment in the new popup window.
-             </p>
-
-             <div className="flex flex-col gap-3 w-full max-w-xs">
-                 <button 
-                    onClick={handleCiderPayComplete}
-                    className="w-full py-4 rounded-xl font-bold text-lg bg-blue-500 text-white shadow-lg shadow-blue-500/30 hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
-                 >
-                    <Check size={20} />
-                    I have completed payment
-                 </button>
-                 
-                 <button 
-                    onClick={() => {
-                        const tier = TIERS.find(t => t.id === selectedTier);
-                        if(tier) startCiderPay(tier);
-                    }}
-                    className="w-full py-3 rounded-xl font-bold text-sm bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-white/20 transition-all flex items-center justify-center gap-2"
-                 >
-                    <MousePointerClick size={16} />
-                    Re-open Window
-                 </button>
-             </div>
-           </div>
-        )}
-
-        {/* --- STEP 2: GENERIC PROCESSING (Used for manual) --- */}
+        {/* STEP: PROCESSING */}
         {step === 'processing' && (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
             <div className="relative mb-8">
-                <div className="w-20 h-20 rounded-full border-[6px] border-white dark:border-brand-surface border-t-brand-pink animate-spin"></div>
+                <div className="w-20 h-20 rounded-full border-[6px] border-slate-100 dark:border-white/5 border-t-brand-pink animate-spin"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <Loader2 size={24} className="text-slate-400 dark:text-gray-500 animate-spin" />
+                    <Loader2 size={24} className="text-slate-400 animate-spin" />
                 </div>
             </div>
             <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Verifying...</h3>
-            <p className="text-slate-500 dark:text-gray-400 text-sm mb-8">Confirming payment status</p>
+            <p className="text-slate-500 dark:text-gray-400 text-sm">Confirming payment status</p>
           </div>
         )}
 
-        {/* --- STEP 3: SUCCESS (Centered) --- */}
+        {/* STEP: SUCCESS */}
         {step === 'success' && (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
              <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center text-white shadow-2xl shadow-green-500/30 mb-6 animate-[bounce_1s_infinite]">
               <Check size={48} strokeWidth={4} />
             </div>
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Pledge Recorded!</h2>
-            <p className="text-slate-600 dark:text-gray-300 mb-8 leading-relaxed">
-                Thank you for your support.<br/>The total funding has been updated.
-            </p>
-            <button 
-              onClick={onClose}
-              className="w-full max-w-xs py-4 rounded-xl bg-slate-100 dark:bg-white text-brand-dark font-bold text-lg hover:bg-slate-200 dark:hover:bg-gray-100 transition-colors"
-            >
-              Close
-            </button>
+            <p className="text-slate-600 dark:text-gray-300 mb-8 leading-relaxed">Thank you for your support.<br/>The total funding has been updated.</p>
+            <button onClick={onClose} className="w-full max-w-xs py-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-brand-dark font-bold text-lg hover:brightness-110 transition-colors">Close</button>
           </div>
         )}
       </div>
