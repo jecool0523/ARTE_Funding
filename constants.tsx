@@ -2,7 +2,7 @@ import { ProjectData, Comment } from './types';
 
 // Reverting to simple relative path to avoid "Invalid URL" errors in environments 
 // where import.meta.url might be undefined or unsupported.
-const VIDEO_PATH = 'assets/rent_video.mp4';
+const VIDEO_PATH = '/assets/rent_video.mp4';
 
 export const PROJECT_DATA: ProjectData = {
   meta: {
